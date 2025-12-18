@@ -1,0 +1,24 @@
+package org.verse.metabird.records.auth;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.io.Serializable;
+
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+@Builder
+public class OAuthCredRequest implements Serializable {
+
+    private String orgType;
+
+    private String username;
+
+    private String password;
+
+    private String securityToken;
+
+}

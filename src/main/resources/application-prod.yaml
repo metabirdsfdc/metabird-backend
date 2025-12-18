@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: metabird
+
+  main:
+    banner-mode: off
+    web-application-type: reactive
+
+  config:
+    import: vault://
+
+  cloud:
+    vault:
+      uri: ${VAULT_URI}
+      authentication: TOKEN
+      token: ${VAULT_TOKEN}
+
+      kv:
+        enabled: true
+        backend: secret
+        application-name: metabird
+        default-context: metabird
+
+  data:
+    mongodb:
+      auto-index-creation: true
+
+server:
+  port: ${SERVER_PORT:8080}
