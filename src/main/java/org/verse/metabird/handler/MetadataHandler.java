@@ -26,7 +26,6 @@ public class MetadataHandler {
 
     public Mono<ServerResponse> fetchMetadataTypes(ServerRequest request) {
         return doAuthenticate(request)
-                .doOnNext(System.out::println)
                 .flatMap(auth ->
                         request.bodyToMono(TypesRequestPayload.class)
                                 .flatMap(payload ->
@@ -141,16 +140,11 @@ public class MetadataHandler {
 
     public Mono<Authentication> doAuthenticate(ServerRequest request) {
         return request.principal()
-                .doOnNext(System.out::println)
                 .switchIfEmpty(
                         Mono.error(
-                                new InsufficientAuthenticationException(
-                                        "Authentication is required"
-                                )
+                                new InsufficientAuthenticationException("Authentication is required")
                         )
-                )
-                .doOnNext(System.out::println)
-                .cast(Authentication.class);
+                ).cast(Authentication.class);
     }
 
     public Mono<Credentials> doValidate(String userKey, String identifier) {

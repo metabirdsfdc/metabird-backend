@@ -19,6 +19,13 @@ public class Helpers {
     public static String transformToActualEndpoint(String soapEndpoint) {
         return soapEndpoint.replaceAll(
                 "/Soap/[uc]/(\\d+\\.\\d+).*$",
+                "/Soap/u/$1"
+        );
+    }
+
+    public static String transformToDataEndpoint(String soapEndpoint) {
+        return soapEndpoint.replaceAll(
+                "/Soap/[uc]/(\\d+\\.\\d+).*$",
                 "/Soap/m/$1"
         );
     }

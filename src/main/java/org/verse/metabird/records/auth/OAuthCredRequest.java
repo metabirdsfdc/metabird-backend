@@ -13,6 +13,9 @@ import java.io.Serializable;
 @Builder
 public class OAuthCredRequest implements Serializable {
 
+
+    private String name;
+    
     private String orgType;
 
     private String username;

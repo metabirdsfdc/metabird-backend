@@ -1,16 +1,22 @@
 package org.verse.metabird.handler;
 
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 import org.verse.metabird.cache.OrganizationCacheService;
+import org.verse.metabird.exceptions.AuthenticationFailedException;
+import org.verse.metabird.exceptions.SalesforceAuthException;
+import org.verse.metabird.exceptions.parser.SalesforceSoapFaultParser;
 import org.verse.metabird.handler.base.AbstractSessionHandler;
 import org.verse.metabird.handler.contract.Organization;
 import org.verse.metabird.records.auth.OAuthCredRequest;
 import org.verse.metabird.records.session.SalesforceSession;
+import org.verse.metabird.utils.Helpers;
 import org.verse.metabird.vault.VaultService;
 import org.verse.metabird.xml.LoginRequestBuilder;
 import reactor.core.publisher.Mono;
@@ -38,9 +44,9 @@ public class OrganizationHandler
     @Override
     public Mono<ServerResponse> create(ServerRequest request) {
         return authenticatedUser(request)
-                .flatMap(user ->
+                .flatMap(authUserEmail ->
                         request.bodyToMono(OAuthCredRequest.class)
-                                .flatMap(req -> authenticateAndStore(user, req))
+                                .flatMap(req -> authenticateAndStore(authUserEmail, req))
                 )
                 .flatMap(this::ok);
     }
@@ -48,6 +54,7 @@ public class OrganizationHandler
     @Override
     public Mono<ServerResponse> getAll(ServerRequest request) {
         return authenticatedUser(request)
+                .doOnNext(System.out::println)
                 .flatMap(user ->
                         ServerResponse.ok()
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -71,27 +78,72 @@ public class OrganizationHandler
     }
 
     private Mono<Map<String, String>> authenticateAndStore(
-            String user,
+            String authUserEmail,
             OAuthCredRequest req
     ) {
+
+        String soapBody = LoginRequestBuilder.builder(
+                req.getUsername(),
+                req.getPassword(),
+                req.getSecurityToken()
+        );
+
+        String url = Helpers.transformToActualEndpoint(authUrl(req.getOrgType()));
+
+
+        System.out.println("==============================");
+        System.out.println(soapBody);
+        System.out.println(url);
+        System.out.println("==============================");
+
         return client.post()
-                .uri(authUrl(req.getOrgType()))
-                .contentType(MediaType.TEXT_XML)
-                .accept(MediaType.TEXT_XML)
+                .uri(url)
+                .header(HttpHeaders.CONTENT_TYPE, "text/xml; charset=UTF-8")
+                .header(HttpHeaders.ACCEPT, "text/xml")
                 .header("SOAPAction", "login")
-                .bodyValue(LoginRequestBuilder.build(
-                        req.getUsername(),
-                        req.getPassword(),
-                        req.getSecurityToken()
-                ))
+                .bodyValue(soapBody)
+
                 .retrieve()
+
+                .onStatus(
+                        HttpStatusCode::isError,
+                        response -> response
+                                .bodyToMono(String.class)
+                                .defaultIfEmpty("Salesforce service unavailable")
+                                .flatMap(body -> {
+                                    SalesforceSoapFaultParser.throwIfFault(body);
+                                    return Mono.error(
+                                            new SalesforceAuthException(
+                                                    "HTTP_" + response.statusCode().value(),
+                                                    "Salesforce service error"
+                                            )
+                                    );
+                                })
+                )
+
                 .bodyToMono(String.class)
+                .doOnNext(SalesforceSoapFaultParser::throwIfFault)
+
                 .map(LoginRequestBuilder::parse)
-                .flatMap(session ->
-                        cache.create(user, session)
-                                .thenReturn(response(session))
-                );
+
+                .switchIfEmpty(Mono.error(
+                        new AuthenticationFailedException("Invalid credentials")
+                ))
+
+                .flatMap(session -> {
+                    if (!session.isAuthenticated()) {
+                        return Mono.error(
+                                new AuthenticationFailedException(
+                                        "Invalid username, password, or security token"
+                                )
+                        );
+                    }
+
+                    return cache.create(authUserEmail, session)
+                            .thenReturn(response(session));
+                });
     }
+
 
     private Map<String, String> response(SalesforceSession s) {
         return Map.of(

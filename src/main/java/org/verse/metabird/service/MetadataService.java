@@ -39,7 +39,7 @@ public class MetadataService {
             List<RetrieveType> retrieveTypes
     ) {
         return executeSoapRequest(
-                Helpers.transformToActualEndpoint(credentials.endpoint()),
+                Helpers.transformToDataEndpoint(credentials.endpoint()),
                 RetrieveRequestFactory.create(
                         credentials,
                         retrieveTypes
@@ -48,7 +48,7 @@ public class MetadataService {
                 .flatMap(AsyncResultParser::extractAsyncId)
                 .flatMap(retrieveId ->
                         pollRetrieveCompletion(
-                                Helpers.transformToActualEndpoint(credentials.endpoint()),
+                                Helpers.transformToDataEndpoint(credentials.endpoint()),
                                 credentials.sessionId(),
                                 retrieveId
                         )
@@ -82,8 +82,9 @@ public class MetadataService {
     }
 
     public Mono<List<String>> listMetadataTypes(Credentials credentials) {
+        String url = Helpers.transformToDataEndpoint(credentials.endpoint());
         return executeSoapRequest(
-                Helpers.transformToActualEndpoint(credentials.endpoint()),
+                url,
                 describe(
                         credentials.sessionId()
                 )
@@ -96,7 +97,7 @@ public class MetadataService {
     ) {
 
         return executeSoapRequest(
-                Helpers.transformToActualEndpoint(credentials.endpoint()),
+                Helpers.transformToDataEndpoint(credentials.endpoint()),
                 list(
                         credentials.sessionId(),
                         payload.type()
@@ -111,7 +112,7 @@ public class MetadataService {
     ) {
 
         return executeSoapRequest(
-                Helpers.transformToActualEndpoint(credentials.endpoint()),
+                Helpers.transformToDataEndpoint(credentials.endpoint()),
                 MetadataRequestBuilder.deploy(
                         credentials.sessionId(),
                         zipBase64,
@@ -121,7 +122,7 @@ public class MetadataService {
                 .flatMap(AsyncResultParser::extractAsyncId)
                 .flatMap(deployId ->
                         pollDeployCompletion(
-                                Helpers.transformToActualEndpoint(credentials.endpoint()),
+                                Helpers.transformToDataEndpoint(credentials.endpoint()),
                                 credentials.sessionId(),
                                 deployId
                         )

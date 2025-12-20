@@ -2,53 +2,103 @@ package org.verse.metabird.xml;
 
 import org.verse.metabird.records.session.SalesforceSession;
 import org.w3c.dom.Document;
+import org.w3c.dom.Element;
 import org.xml.sax.InputSource;
 
+import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
 import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathFactory;
 import java.io.StringReader;
+import java.io.StringWriter;
 
 public final class LoginRequestBuilder {
+
+    private static final String SOAP_ENV =
+            "http://schemas.xmlsoap.org/soap/envelope/";
+    private static final String PARTNER_NS =
+            "urn:partner.soap.sforce.com";
 
     private LoginRequestBuilder() {
     }
 
+
     public static String builder(String username, String password, String token) {
         return """
                 <?xml version="1.0" encoding="utf-8" ?>
-                                <env:Envelope xmlns:xsd="http:www.w3.org/2001/XMLSchema"
-                                   xmlns:xsi="http:www.w3.org/2001/XMLSchema-instance"
-                                   xmlns:env="http:schemas.xmlsoap.org/soap/envelope/">
-                                 <env:Body>
-                                   <n1:login xmlns:n1="urn:partner.soap.sforce.com">
-                                     <n1:username>%s</n1:username>
-                                     <n1:password>%s</n1:password>
-                                   </n1:login>
-                                 </env:Body>
-                               </env:Envelope>
+                <env:Envelope xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:env="http://schemas.xmlsoap.org/soap/envelope/">
+                  <env:Body>
+                    <n1:login xmlns:n1="urn:partner.soap.sforce.com">
+                      <n1:username>%s</n1:username>
+                      <n1:password>%s</n1:password>
+                    </n1:login>
+                  </env:Body>
+                </env:Envelope>
                 """.formatted(username, password + token);
     }
 
-    public static String build(String username, String password, String securityToken) {
+    public static String build(
+            String username,
+            String password,
+            String securityToken
+    ) {
+        try {
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            factory.setNamespaceAware(true);
 
-        String passwordToken = password + securityToken;
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            Document doc = builder.newDocument();
 
-        return """
-                <?xml version="1.0" encoding="utf-8" ?>
-                                <env:Envelope xmlns:xsd="http://www.w3.org/2001/XMLSchema"
-                                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                                   xmlns:env="http://schemas.xmlsoap.org/soap/envelope/">
-                                 <env:Body>
-                                   <n1:login xmlns:n1="urn:partner.soap.sforce.com">
-                                     <n1:username>%s</n1:username>
-                                     <n1:password>%s</n1:password>
-                                   </n1:login>
-                                 </env:Body>
-                               </env:Envelope>
-                """.formatted(username, passwordToken);
+            Element envelope = doc.createElementNS(SOAP_ENV, "env:Envelope");
+            envelope.setAttribute("xmlns:xsd", "http://www.w3.org/2001/XMLSchema");
+            envelope.setAttribute("xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance");
+            doc.appendChild(envelope);
+
+            Element body = doc.createElementNS(SOAP_ENV, "env:Body");
+            envelope.appendChild(body);
+
+            Element login = doc.createElementNS(PARTNER_NS, "n1:login");
+            body.appendChild(login);
+
+            Element user = doc.createElementNS(PARTNER_NS, "n1:username");
+            user.setTextContent(username);
+            login.appendChild(user);
+
+            Element pass = doc.createElementNS(PARTNER_NS, "n1:password");
+            pass.setTextContent(password + securityToken);
+            login.appendChild(pass);
+
+            return toPrettyString(doc);
+
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to build SOAP login request", e);
+        }
     }
+
+    private static String toPrettyString(Document doc) throws Exception {
+        TransformerFactory tf = TransformerFactory.newInstance();
+        Transformer transformer = tf.newTransformer();
+
+        transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "no");
+        transformer.setOutputProperty(OutputKeys.ENCODING, "utf-8"); // lowercase
+        transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+        transformer.setOutputProperty(
+                "{http://xml.apache.org/xslt}indent-amount", "2"
+        );
+
+        StringWriter writer = new StringWriter();
+        transformer.transform(new DOMSource(doc), new StreamResult(writer));
+
+        return writer.toString()
+                .replace(" standalone=\"no\"", "");
+    }
+
 
     public static SalesforceSession parse(String xml) {
 

@@ -1,6 +1,7 @@
 package org.verse.metabird.cache.base;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.verse.metabird.cache.CrudOperations;
@@ -59,10 +60,20 @@ public abstract class AbstractUpstashListCacheService<K, V, I>
         return getList(redisKey)
                 .defaultIfEmpty(new ArrayList<>())
                 .flatMap(list -> {
+                    int before = list.size();
                     list.removeIf(matchByIdentifier(identifier));
+                    int after = list.size();
+                    if (before == after) {
+                        return Mono.just(false);
+                    }
                     return saveList(redisKey, list);
+                })
+                .onErrorResume(ex -> {
+                    ex.printStackTrace();
+                    return Mono.just(false);
                 });
     }
+
 
     @Override
     public Mono<V> read(K key, I identifier) {
@@ -84,7 +95,10 @@ public abstract class AbstractUpstashListCacheService<K, V, I>
                 .retrieve()
                 .bodyToMono(String.class)
                 .flatMap(this::deserialize)
-                .onErrorResume(e -> Mono.empty());
+                .onErrorResume(ex -> {
+                    ex.printStackTrace();
+                    return Mono.empty();
+                });
     }
 
     private Mono<Boolean> saveList(String key, List<V> list) {
@@ -96,17 +110,45 @@ public abstract class AbstractUpstashListCacheService<K, V, I>
                                 .bodyToMono(String.class)
                 )
                 .map(r -> true)
-                .onErrorReturn(false);
+                .onErrorResume(ex -> {
+                    ex.printStackTrace();
+                    return Mono.just(false);
+                });
     }
 
+
     private Mono<List<V>> deserialize(String json) {
-        if (json == null || "null".equalsIgnoreCase(json)) {
+
+        if (json == null || json.trim().equalsIgnoreCase("null")) {
             return Mono.empty();
         }
+
         try {
-            return Mono.just(objectMapper.readValue(json, listType));
+            JsonNode root = objectMapper.readTree(json);
+
+            JsonNode resultNode = root.get("result");
+            if (resultNode == null || resultNode.isNull()) {
+                return Mono.empty();
+            }
+
+            String resultJson = resultNode.asText();
+
+            if (resultJson == null || resultJson.isBlank()
+                    || resultJson.equalsIgnoreCase("null")) {
+                return Mono.empty();
+            }
+
+            List<V> list = objectMapper.readValue(resultJson, listType);
+
+            if (list == null || list.isEmpty()) {
+                return Mono.empty();
+            }
+
+            return Mono.just(list);
+
         } catch (Exception e) {
-            return Mono.error(e);
+            e.printStackTrace();
+            return Mono.empty();
         }
     }
 
@@ -114,6 +156,7 @@ public abstract class AbstractUpstashListCacheService<K, V, I>
         try {
             return Mono.just(objectMapper.writeValueAsString(list));
         } catch (Exception e) {
+            e.printStackTrace();
             return Mono.error(e);
         }
     }

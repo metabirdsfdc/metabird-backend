@@ -1,0 +1,7 @@
+package org.verse.metabird.exceptions;
+
+public class AuthenticationFailedException extends RuntimeException {
+    public AuthenticationFailedException(String message) {
+        super(message);
+    }
+}

@@ -3,6 +3,8 @@ package org.verse.metabird.service.impl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.verse.metabird.exceptions.AuthenticationException;
+import org.verse.metabird.exceptions.UserAlreadyExistsException;
 import org.verse.metabird.jwt.JwtService;
 import org.verse.metabird.model.Client;
 import org.verse.metabird.records.auth.AuthResponse;
@@ -14,7 +16,6 @@ import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -24,13 +25,13 @@ public class OAuthServiceImpl implements OAuthService {
     private final PasswordEncoder passwordEncoder;
     private final ClientRepository clientRepository;
 
-
     private AuthResponse buildAuthResponse(Client client) {
         String accessToken = jwtService.generateToken(
                 Map.of("roles", client.getAuthorities()),
                 client.getUsername()
         );
         String refreshToken = jwtService.generateRefreshToken(client.getUsername());
+
         return AuthResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
@@ -45,13 +46,15 @@ public class OAuthServiceImpl implements OAuthService {
 
     @Override
     public Mono<AuthResponse> login(LoginPayload request) {
-        return clientRepository.findByUsername(request.username())
+        return clientRepository.findByUsername(request.getUsername())
                 .switchIfEmpty(
-                        Mono.error(new RuntimeException("Invalid username or password"))
+                        Mono.error(new AuthenticationException("Invalid username or password"))
                 )
                 .flatMap(client -> {
-                    if (!passwordEncoder.matches(request.password(), client.getPassword())) {
-                        return Mono.error(new RuntimeException("Invalid username or password"));
+                    if (!passwordEncoder.matches(request.getPassword(), client.getPassword())) {
+                        return Mono.error(
+                                new AuthenticationException("Invalid username or password")
+                        );
                     }
                     return Mono.just(buildAuthResponse(client));
                 });
@@ -59,25 +62,23 @@ public class OAuthServiceImpl implements OAuthService {
 
     @Override
     public Mono<Object> signup(SignUpPayload request) {
-        return clientRepository.existsByUsername(request.username())
+        return clientRepository.existsByUsername(request.getUsername())
                 .flatMap(exists -> {
                     if (exists) {
-                        return Mono.just(Map.of("error", "User already exists"));
+                        return Mono.error(
+                                new UserAlreadyExistsException("User already exists")
+                        );
                     }
+
                     Client client = Client.builder()
-                            .fullName(request.fullName())
-                            .username(request.username())
-                            .password(Objects.requireNonNull(passwordEncoder.encode(request.password())))
+                            .fullName(request.getFullName())
+                            .username(request.getUsername())
+                            .password(passwordEncoder.encode(request.getPassword()))
                             .roles(List.of("ROLE_USER"))
                             .build();
 
                     return clientRepository.save(client)
                             .map(this::buildAuthResponse);
-                })
-
-                .onErrorResume(ex ->
-                        Mono.just(Map.of("error", "Signup failed: " + ex.getMessage()))
-                );
+                });
     }
-
 }

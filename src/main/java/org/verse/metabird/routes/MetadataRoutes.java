@@ -20,8 +20,6 @@ public class MetadataRoutes {
                 .POST("/api/metadata/deploy", handler::pushMetadata)
                 .POST("/api/metadata/deployment/execute", handler::executeMetadataDeployment)
                 .build();
-
-
     }
 
 }

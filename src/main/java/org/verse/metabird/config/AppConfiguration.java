@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
@@ -55,6 +56,7 @@ public class AppConfiguration {
                 .build();
     }
 
+    @Profile("dev")
     @Bean
     public MongoClient mongoClient(VaultService vaultService) {
         return MongoClients.create(vaultService.mongoUri());

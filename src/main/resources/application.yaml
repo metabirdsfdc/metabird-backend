@@ -9,24 +9,6 @@ spring:
 server:
   port: ${SERVER_PORT:8080}
 
-app:
-  mongo:
-    uri: ${MONGO_URI}
-  frontend:
-    url: ${FRONTEND_URL}
-  jwt:
-    secret: ${JWT_SECRET}
-    expiration: ${JWT_EXPIRATION}
-    refresh-expiration: ${JWT_REFRESH_EXPIRATION}
-  redis:
-    prefix: ${REDIS_PREFIX}
-  upstash:
-    url: ${UPSTASH_URL}
-    token: ${UPSTASH_TOKEN}
-  salesforce:
-    production: ${SALESFORCE_PRODUCTION}
-    sandbox: ${SALESFORCE_SANDBOX}
-
 logging:
   level:
     root: INFO
