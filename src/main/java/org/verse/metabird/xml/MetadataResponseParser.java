@@ -46,7 +46,7 @@ public final class MetadataResponseParser {
             String type = XmlParser.text(el, "type");
             String manageableState = XmlParser.text(el, "manageableState");
 
-            if ("unmanaged".equalsIgnoreCase(manageableState)) {
+            if ("managed".equalsIgnoreCase(manageableState)) {
                 continue;
             }
 

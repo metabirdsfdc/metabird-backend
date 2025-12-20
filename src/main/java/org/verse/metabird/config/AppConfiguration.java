@@ -64,7 +64,7 @@ public class AppConfiguration {
 
 
     @Bean
-    @Profile("prod")
+    @Profile("dev")
     @Qualifier("upstashRedisClient")
     public WebClient upstashWebClient(VaultService vaultService) {
         return WebClient.builder()
