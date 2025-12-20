@@ -7,7 +7,7 @@ spring:
     web-application-type: reactive
 
 server:
-  port: ${SERVER_PORT:8080}
+  port: ${PORT:8080}
 
 logging:
   level:

@@ -1,13 +1,7 @@
 spring:
-  application:
-    name: metabird
-
-  main:
-    banner-mode: off
-    web-application-type: reactive
-
-server:
-  port: ${SERVER_PORT:8080}
+  config:
+    activate:
+      on-profile: prod
 
 app:
   mongo:
